@@ -142,6 +142,8 @@ def get_methods(id_to_node, id_to_connections):
             for connection_id in id_to_connections[node.id]:
                 if id_to_node[connection_id].contents == "METHOD":
                     method_dict = {'parameters': []}
+
+                    # extract return type of the method
                     for method_child in id_to_connections[connection_id]:
                         method_child_node = id_to_node[method_child]
                         if method_child_node.contents == "RETURN_TYPE":
@@ -150,21 +152,8 @@ def get_methods(id_to_node, id_to_connections):
                                 method_child_node.startPosition,
                                 method_child_node.endPosition
                             )
-                        if method_child_node.contents == "BODY":
-                            body_ast = {'root': method_child}
 
-                            _, new_id_to_node, new_id_to_connections = \
-                                get_subtree(method_child, id_to_node, id_to_connections)
-                            body_ast['id_to_node'] = new_id_to_node
-                            body_ast['id_to_connections'] = new_id_to_connections
-                            body_ast['source'] = get_tokens(
-                                id_to_node.values(),
-                                method_child_node.startPosition,
-                                method_child_node.endPosition
-                            )
-
-                            method_dict['body'] = body_ast
-
+                        # extract parameters of the method (optional)
                         if method_child_node.contents == "PARAMETERS":
                             for parameter_child in id_to_connections[method_child]:
                                 if id_to_node[parameter_child].contents == "VARIABLE":
@@ -181,20 +170,37 @@ def get_methods(id_to_node, id_to_connections):
                                             )[0]
                                     if 'type' in parameter and 'name' in parameter:
                                         method_dict['parameters'].append(parameter)
+
                     if 'type' in method_dict:
                         for name_node in id_to_node.values():
+                            # extract name
                             if connection_id in id_to_connections[name_node.id] \
                                     and name_node.type == FeatureNode.SYMBOL_MTH:
                                 method_dict['name'] = name_node.contents.split("(")[0]
 
+                            # extract javadoc and body AST
                             if connection_id in id_to_connections[name_node.id] \
                                     and name_node.type == FeatureNode.COMMENT_JAVADOC:
                                 javadoc_comment = name_node.contents
                                 javadoc_comment = clean_javadoc(javadoc_comment)
-                                if len(javadoc_comment.strip()) > 5:
-                                    method_dict['javadoc'] = name_node.contents
-                        if 'javadoc' not in method_dict and 'body' in method_dict:
-                            method_dict.pop("body")
+                                method_dict['javadoc'] = javadoc_comment
+
+                                # since we found javadoc, we extract the body AST
+                                for method_child in id_to_connections[connection_id]:
+                                    method_child_node = id_to_node[method_child]
+                                    if method_child_node.contents == "BODY":
+                                        body_ast = {'root': method_child}
+
+                                        _, new_id_to_node, new_id_to_connections = \
+                                            get_subtree(method_child, id_to_node, id_to_connections)
+                                        body_ast['id_to_node'] = new_id_to_node
+                                        body_ast['id_to_connections'] = new_id_to_connections
+                                        body_ast['source'] = get_tokens(
+                                            id_to_node.values(),
+                                            method_child_node.startPosition,
+                                            method_child_node.endPosition
+                                        )
+                                        method_dict['body'] = body_ast
                         methods.append(method_dict)
     return methods
 
