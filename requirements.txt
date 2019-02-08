@@ -1,0 +1,4 @@
+google
+dpu-utils
+numpy
+protobuf
