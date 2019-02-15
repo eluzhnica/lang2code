@@ -2,3 +2,4 @@ google
 dpu-utils
 numpy
 protobuf
+torch

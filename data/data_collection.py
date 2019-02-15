@@ -206,12 +206,15 @@ def get_methods(id_to_node, id_to_connections):
 
 
 def update_statistics(source_dict, statistics):
-    statistics['total_classes'] += 1
-    statistics['methods'] += len(source_dict['methods'])
-    statistics['fields'] += len(source_dict['fields'])
-
+    updated = False
     for method in source_dict['methods']:
         if 'javadoc' in method:
+            if not updated:
+                statistics['total_classes_with_javadoc'] += 1
+                statistics['methods'] += len(source_dict['methods'])
+                statistics['fields'] += len(source_dict['fields'])
+                updated = True
+
             statistics['methods_with_javadoc'] += 1
             statistics['javadoc_length'] += len(method['javadoc'])
             if 'body' in method and 'source' in method['body']:
@@ -228,7 +231,7 @@ def extract_corpus_features(rootdir):
         'javadoc_code_characters': 0,
         'javadoc_ast_nodes': 0,
         'javadoc_length': 0,
-        'total_classes': 0,
+        'total_classes_with_javadoc': 0,
         'methods_with_javadoc': 0
     }
 
@@ -239,6 +242,7 @@ def extract_corpus_features(rootdir):
                 g = Graph()
                 print(path)
                 g.ParseFromString(f.read())
+                print(g)
                 id_to_node, id_to_connections = graph_to_map(g)
                 methods = get_methods(id_to_node, id_to_connections)
                 fields = get_fields(id_to_node, id_to_connections)
