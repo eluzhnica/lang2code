@@ -2,4 +2,5 @@ google
 dpu-utils
 numpy
 protobuf
-torch
+allennlp==0.3.0
+matplotlib

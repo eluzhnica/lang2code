@@ -110,7 +110,8 @@ class Decoder(nn.Module):
                  non_terminals_length,
                  rules_length,
                  embedding_dim,
-                 decoder_rnn_size
+                 decoder_rnn_size,
+                 max_prod_rules
                  ):
         super(Decoder, self).__init__()
 
@@ -127,6 +128,10 @@ class Decoder(nn.Module):
         # self.copy_linear = nn.Linear(3*decoder_rnn_size, decoder_rnn_size)
         self.attn_linear = nn.Linear(3*decoder_rnn_size, decoder_rnn_size)
 
+        self.ct_weights = nn.Linear(decoder_rnn_size, max_prod_rules)
+
+        self.copy_weights = nn.Linear(decoder_rnn_size, 1)
+
         self.init_hidden()
 
     def init_hidden(self):
@@ -134,72 +139,31 @@ class Decoder(nn.Module):
         self.decoder_state = (torch.zeros(1, 1, self.decoder_lstm.hidden_size),
                                torch.zeros(1, 1, self.decoder_lstm.hidden_size))
 
-    def forward(self, init_nt, init_prod, nl_hidden_state, nt_to_rules, nl_encoding, env_encoding):
-        self.decoder_state = nl_hidden_state
+    def forward(self, init_prod, nt_to_rules, nl_encoding, env_encoding):
+        init_prod_emb = self.nt_embedding(init_prod)
 
-        init_nt_emb = self.nt_embedding(init_nt)
-        init_prod_emb = self.rules_embedding(init_prod)
+        # lstm_input = torch.cat((current_nt, last_prod))
+        st, self.decoder_state = self.decoder_lstm(init_prod_emb, self.decoder_state)
+        self.decoder_state = self.decoder_state[0]
 
-        stack = [init_prod_emb]
-        last_prod = init_prod_emb
+        zt, z_attentions = self.nl_attention(nl_encoding, st)
+        # zt = zt.view(zt.shape[2], 1, -1)
 
-        results = []
-        while len(stack) != 0:
-            current_nt = stack.pop()
-            lstm_input = torch.cat((current_nt, last_prod))
-            st, self.decoder_state = self.decoder_lstm(lstm_input, self.decoder_state)
-            self.decoder_state = self.decoder_state[0]
+        et, e_attentions = self.env_attention(env_encoding, zt)
+        # et = et.view(et.shape[2], 1, -1)
 
-            zt, z_attentions = self.nl_attention(nl_encoding, st)
-            # zt = zt.view(zt.shape[2], 1, -1)
+        conc = torch.cat((st, zt, et))
+        ct = F.tanh(self.attn_linear(conc))
+        next_prod_rule = self.ct_weights(ct)
+        next_prod_rule_masked = next_prod_rule.where(prod_rules_masked(init_prod), next_prod_rule, -1000000)
+        next_prod_rule = F.softmax(next_prod_rule_masked)
 
-            et, e_attentions = self.env_attention(env_encoding, zt)
-            # et = et.view(et.shape[2], 1, -1)
+        copy_t = F.sigmoid(self.copy_weights(ct))
 
-            conc = torch.cat((st, zt, et))
-            ct = F.tanh(self.attn_linear(conc))
-            results.append((ct, current_nt))
-
-            # TODO: Update state and add copy attention
-        return results
-
-
+        # return
 
 
 class Attention(nn.Module):
-    r"""
-    Applies an attention mechanism on the output features from the decoder.
-
-    .. math::
-            \begin{array}{ll}
-            x = context*output \\
-            attn = exp(x_i) / sum_j exp(x_j) \\
-            output = \tanh(w * (attn * context) + b * output)
-            \end{array}
-
-    Args:
-        dim(int): The number of expected features in the output
-
-    Inputs: output, context
-        - **output** (batch, output_len, dimensions): tensor containing the output features from the decoder.
-        - **context** (batch, input_len, dimensions): tensor containing features of the encoded input sequence.
-
-    Outputs: output, attn
-        - **output** (batch, output_len, dimensions): tensor containing the attended output features from the decoder.
-        - **attn** (batch, output_len, input_len): tensor containing attention weights.
-
-    Attributes:
-        linear_out (torch.nn.Linear): applies a linear transformation to the incoming data: :math:`y = Ax + b`.
-        mask (torch.Tensor, optional): applies a :math:`-inf` to the indices specified in the `Tensor`.
-
-    Examples::
-
-         >>> attention = Attention(256)
-         >>> context = Variable(torch.randn(5, 3, 256))
-         >>> output = Variable(torch.randn(5, 5, 256))
-         >>> output, attn = attention(output, context)
-
-    """
     def __init__(self, dim):
         super(Attention, self).__init__()
         self.linear_out = nn.Linear(dim*2, dim)

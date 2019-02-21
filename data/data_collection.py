@@ -1,10 +1,102 @@
 import json
+import numpy as np
 import os
 import sys
 import codecs
+from re import finditer
 
 from data.graph_pb2 import Graph
 from data.graph_pb2 import FeatureNode
+
+t_to_source = {
+    'ABSTRACT': "abstract",
+    'BREAK': "break",
+    'CASE': "case",
+    'CATCH': "catch",
+    'CLASS': "class",
+    'CONST': "const",
+    'CONTINUE': "continue",
+    'DEFAULT': "default",
+    'DO': "do",
+    'ELSE': "else",
+    'EXTENDS': "extends",
+    'FINAL': "final",
+    'FINALLY': "finally",
+    'FOR': "for",
+    'GOTO': "goto",
+    'IF': "if",
+    'IMPLEMENTS': "implements",
+    'IMPORT': "import",
+    'INSTANCEOF': "instanceof",
+    'INTERFACE': "interface",
+    'NATIVE': "native",
+    'NEW': "new",
+    'PACKAGE': "package",
+    'PRIVATE': "private",
+    'PROTECTED': "protected",
+    'PUBLIC': "public",
+    'RETURN': "return",
+    'STATIC': "static",
+    'STRICTFP': "strictfp",
+    'SWITCH': "switch",
+    'SYNCHRONIZED': "synchronized",
+    'THROW': "throw",
+    'THROWS': "throws",
+    'TRANSIENT': "transient",
+    'TRY': "try",
+    'VOLATILE': "volatile",
+    'WHILE': "while",
+    'ARROW': "->",
+    'COLCOL': "::",
+    'LPAREN': "(",
+    'RPAREN': ")",
+    'LBRACE': "{",
+    'RBRACE': "}",
+    'LBRACKET': "[",
+    'RBRACKET': "]",
+    'SEMI': ";",
+    'COMMA': ",",
+    'DOT': ".",
+    'ELLIPSIS': "...",
+    'EQ': "=",
+    'GT': ">",
+    'LT': "<",
+    'BANG': "!",
+    'TILDE': "~",
+    'QUES': "?",
+    'COLON': ":",
+    'EQEQ': "==",
+    'LTEQ': "<=",
+    'GTEQ': ">=",
+    'BANGEQ': "!=",
+    'AMPAMP': "&&",
+    'BARBAR': "||",
+    'PLUSPLUS': "++",
+    'SUBSUB': "--",
+    'PLUS': "+",
+    'SUB': "-",
+    'STAR': "*",
+    'SLASH': "/",
+    'AMP': "&",
+    'BAR': "|",
+    'CARET': "^",
+    'PERCENT': "%",
+    'LTLT': "<<",
+    'GTGT': ">>",
+    'GTGTGT': ">>>",
+    'PLUSEQ': "+=",
+    'SUBEQ': "-=",
+    'STAREQ': "*=",
+    'SLASHEQ': "/=",
+    'AMPEQ': "&=",
+    'BAREQ': "|=",
+    'CARETEQ': "^=",
+    'PERCENTEQ': "%=",
+    'LTLTEQ': "<<=",
+    'GTGTEQ': ">>=",
+    'GTGTGTEQ': ">>>=",
+    'MONKEYS_AT': "@"
+}
 
 
 def stringify_node(node):
@@ -21,6 +113,16 @@ def stringify_node(node):
     return node_dict
 
 
+def to_original_source_code(source_tokens):
+    result = []
+    for token in source_tokens:
+        if token in t_to_source:
+            result.append(t_to_source[token])
+        else:
+            result.append(token)
+    return result
+
+
 def graph_to_map(graph):
     id_to_node = {}
     id_to_connections = {}
@@ -30,7 +132,7 @@ def graph_to_map(graph):
         id_to_connections[node.id] = set()
 
     for edge in graph.edge:
-        id_to_connections[edge.sourceId] = id_to_connections[edge.sourceId].union({edge.destinationId})
+        id_to_connections[edge.sourceId].add(edge.destinationId)
 
     for key in id_to_connections:
         id_to_connections[key] = list(id_to_connections[key])
@@ -38,13 +140,40 @@ def graph_to_map(graph):
     return id_to_node, id_to_connections
 
 
-def get_tokens(nodes, start_position, end_position):
+def get_source(file, start_position, end_position):
+    with open(file, 'rb') as f:
+        file_str = f.read()
+        return file_str
+
+
+def get_tokens(nodes, string_nodes, start_position, end_position):
     tokens = []
     for node in nodes:
         if node.type == FeatureNode.IDENTIFIER_TOKEN or node.type == FeatureNode.TOKEN:
             if node.startPosition >= start_position and node.endPosition <= end_position:
-                tokens.append(node.contents)
+                if node.id in string_nodes:
+                    content = f"\"{node.contents}\""
+                    tokens.append(content.encode("unicode_escape").decode("UTF-8"))
+                else:
+                    tokens.append(node.contents)
     return tokens
+
+
+def get_string_nodes(id_to_node, id_to_connections):
+    string_nodes = set()
+
+    for node in id_to_node.values():
+        if node.contents == "STRING_LITERAL":
+            count = 0
+            for con in id_to_connections[node.id]:
+                con_node = id_to_node[con]
+                if con_node.type in [FeatureNode.IDENTIFIER_TOKEN, FeatureNode.TOKEN] \
+                        and con_node.contents not in t_to_source:
+                    count += 1
+                    string_nodes.add(con)
+                    # if count > 1:
+                    #     print("Something is wrong", [id_to_node[x].contents for x in id_to_connections[node.id]], node.id)
+    return string_nodes
 
 
 def clean_javadoc(javadoc_str):
@@ -64,6 +193,7 @@ def clean_javadoc(javadoc_str):
 # }]
 def get_fields(id_to_node, id_to_connections):
     fields = []
+    string_nodes = get_string_nodes(id_to_node, id_to_connections)
 
     for node in id_to_node.values():
         if node.type == FeatureNode.FAKE_AST and node.contents == "MEMBERS":
@@ -75,6 +205,7 @@ def get_fields(id_to_node, id_to_connections):
                         if field_child_node.contents == "TYPE":
                             field['type'] = get_tokens(
                                 id_to_node.values(),
+                                string_nodes,
                                 field_child_node.startPosition,
                                 field_child_node.endPosition
                             )[0]
@@ -132,11 +263,12 @@ def get_subtree_dfs(root_id, id_to_node, id_to_connections):
 #     },
 #     'name': name,
 #     'type': return_type,
-#     'javadoc': javadoc_string
+#     'javadoc': javadoc_string,
+#     'parameters': [{'name': name, 'type': type}]
 # }]
 def get_methods(id_to_node, id_to_connections):
     methods = []
-
+    string_nodes = get_string_nodes(id_to_node, id_to_connections)
     for node in id_to_node.values():
         if node.type == FeatureNode.FAKE_AST and node.contents == "MEMBERS":
             for connection_id in id_to_connections[node.id]:
@@ -149,6 +281,7 @@ def get_methods(id_to_node, id_to_connections):
                         if method_child_node.contents == "RETURN_TYPE":
                             method_dict['type'] = get_tokens(
                                 id_to_node.values(),
+                                string_nodes,
                                 method_child_node.startPosition,
                                 method_child_node.endPosition
                             )
@@ -165,6 +298,7 @@ def get_methods(id_to_node, id_to_connections):
                                         elif variable_child_node.contents == "TYPE":
                                             parameter['type'] = get_tokens(
                                                 id_to_node.values(),
+                                                string_nodes,
                                                 variable_child_node.startPosition,
                                                 variable_child_node.endPosition
                                             )[0]
@@ -176,7 +310,10 @@ def get_methods(id_to_node, id_to_connections):
                             # extract name
                             if connection_id in id_to_connections[name_node.id] \
                                     and name_node.type == FeatureNode.SYMBOL_MTH:
+                                # print(name_node.contents, method_dict['type'])
                                 method_dict['name'] = name_node.contents.split("(")[0]
+                                if ">" in method_dict['name']:
+                                    method_dict['name'] = method_dict['name'].split(">")[1]
 
                             # extract javadoc and body AST
                             if connection_id in id_to_connections[name_node.id] \
@@ -197,6 +334,7 @@ def get_methods(id_to_node, id_to_connections):
                                         body_ast['id_to_connections'] = new_id_to_connections
                                         body_ast['source'] = get_tokens(
                                             id_to_node.values(),
+                                            string_nodes,
                                             method_child_node.startPosition,
                                             method_child_node.endPosition
                                         )
@@ -223,6 +361,159 @@ def update_statistics(source_dict, statistics):
                 statistics['javadoc_ast_nodes'] += len(method['body']['id_to_node'])
 
 
+def extract_concode_like_features(rootdir, seed):
+    train = 0.8
+    test = 0.1
+    np.random.seed(seed)
+
+    count = 0
+    for root, _, files in os.walk(rootdir):
+        for file in files:
+            path = os.path.join(root, file)
+            if not path.endswith(".json"):
+                with open(path, 'rb') as f:
+                    count += 1
+                    g = Graph()
+                    print(path)
+                    g.ParseFromString(f.read())
+                    # print(g)
+                    id_to_node, id_to_connections = graph_to_map(g)
+                    methods = get_methods(id_to_node, id_to_connections)
+                    fields = get_fields(id_to_node, id_to_connections)
+
+                    source_dict = {
+                        'methods': methods,
+                        'fields': fields,
+                        'path': path
+                    }
+
+                    data = create_data(source_dict)
+
+                    rnd = np.random.rand()
+                    if rnd > train+test:
+                        file_name = "valid"
+                    elif rnd > train:
+                        file_name = "test"
+                    else:
+                        file_name = "train"
+
+                    with codecs.open(file_name + '.json', 'a', 'utf-8') as out:
+                        for d in data:
+                            json_dump = json.dumps(d, ensure_ascii=False)
+                            out.write(json_dump)
+                            out.write("\n")
+
+
+def create_data(class_json):
+    methods_with_javadoc = []
+    for method in class_json['methods']:
+        if 'javadoc' in method:
+            methods_with_javadoc.append(method)
+
+    dataset = []
+    for javadoc_method in methods_with_javadoc:
+        if 'body' in javadoc_method:
+            datapoint = {
+                'nl': extract_javadoc_from_method(javadoc_method),
+                'nlToks': extract_javadoc_from_method(javadoc_method).split(" "),
+                'memberVariables': extract_fields(class_json),
+                'memberFunctions': extract_methods(class_json, javadoc_method),
+                'code': extract_code(javadoc_method),
+                'renamed': extract_code(javadoc_method),
+                'repo': "no_repo",
+                "className": extract_class_name(class_json)
+            }
+            dataset.append(datapoint)
+    return dataset
+
+
+def split_camel_case(name):
+    matches = finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', name)
+    return [m.group(0) for m in matches]
+
+
+def extract_class_name(class_json):
+    path = class_json['path']
+    name = path.split("/")[-1].split(".")[0]
+    return name
+
+
+def extract_code(javadoc_method):
+    source = javadoc_method['body']['source']
+    parameters = []
+    if 'parameters' in javadoc_method:
+        for parameter in javadoc_method['parameters']:
+            string_value = [parameter['type']] + [parameter['name']]
+            if len(parameters) == 0:
+                parameters += string_value
+            else:
+                parameters += ([","] + string_value)
+    method_string = javadoc_method['type'] + [javadoc_method['name']]
+    result = method_string + ["LPAREN"] + parameters + ["RPAREN"] + source
+    result = to_original_source_code(result)
+
+    return result
+
+
+def rename_code(javadoc_method):
+    names = {}
+
+    source = javadoc_method['body']['source']
+    parameters = []
+    if 'parameters' in javadoc_method:
+        for parameter in javadoc_method['parameters']:
+            new_name = "arg" + str(len(names))
+            names[parameter['name']] = new_name
+            string_value = [parameter['type']] + [new_name]
+            if len(parameters) == 0:
+                parameters += string_value
+            else:
+                parameters += ([","] + string_value)
+    method_string = javadoc_method['type'] + ["function"]
+    renamed_source = []
+    for token in source:
+        if token in names:
+            renamed_source.append(names[token])
+        else:
+            renamed_source.append(token)
+
+    result = method_string + ["LPAREN"] + parameters + ["RPAREN"] + source
+    result = to_original_source_code(result)
+    return result
+
+
+def extract_fields(class_json):
+    fields = class_json['fields']
+    result = {}
+    for field in fields:
+        # print("Field", field)
+        key = field['name'] + "=0"
+        value = ''.join(field['type'])
+        result[key] = value
+    return result
+
+
+def extract_methods(class_json, javadoc_method):
+    methods = {}
+    for method in class_json['methods']:
+        if not('javadoc' in method and method['javadoc'] == javadoc_method['javadoc']):
+            key = method['name']
+            value = [''.join(method['type'])]
+
+            if 'parameters' in method:
+                for parameter in method['parameters']:
+                    string_value = ''.join(parameter['type']) + " " + parameter['name']
+                    value.append(string_value)
+
+            methods[key] = [value]
+    return methods
+
+
+def extract_javadoc_from_method(javadoc_method):
+    javadoc = javadoc_method['javadoc']
+    return javadoc
+
+
 def extract_corpus_features(rootdir):
     statistics = {
         'methods': 0,
@@ -242,7 +533,7 @@ def extract_corpus_features(rootdir):
                 g = Graph()
                 print(path)
                 g.ParseFromString(f.read())
-                print(g)
+                # print(g)
                 id_to_node, id_to_connections = graph_to_map(g)
                 methods = get_methods(id_to_node, id_to_connections)
                 fields = get_fields(id_to_node, id_to_connections)
