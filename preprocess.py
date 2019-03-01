@@ -98,7 +98,7 @@ class Vocab:
         self.stoi[sym] = len(self.itos)
         self.itos.append(sym)
 
-    def __init__(self, elements, prune, max_num, start=True, stop=True, pad=True, unk=True, rule=False):
+    def __init__(self, elements, prune, max_num, start=True, stop=True, pad=True, unk=True, rule=False, prune_terminal=10):
         self.start = start
         self.stop = stop
         vocab = Counter()
@@ -118,7 +118,9 @@ class Vocab:
             vocab[w] += 1
 
         for (w, f) in vocab.most_common(self.max_num):
-            if (f > prune or (rule == True and not CDDataset._is_terminal_rule(w))):
+            if rule and CDDataset._is_terminal_rule(w) and f < prune_terminal:
+                self.stoi[w] = self.stoi['<unk>']
+            elif f > prune or (rule == True and not CDDataset._is_terminal_rule(w)):
                 self.itos.append(w)
                 self.stoi[w] = len(self.itos) - 1
             else:  # map everything else to unk

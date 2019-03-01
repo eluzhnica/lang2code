@@ -7,6 +7,8 @@ from re import finditer
 
 from data.graph_pb2 import Graph
 from data.graph_pb2 import FeatureNode
+from interruptingcow import timeout
+
 
 t_to_source = {
     'ABSTRACT': "abstract",
@@ -96,6 +98,11 @@ t_to_source = {
     'GTGTEQ': ">>=",
     'GTGTGTEQ': ">>>=",
     'MONKEYS_AT': "@"
+}
+
+method_stats = {
+    'qualified': 0,
+    'total': 0
 }
 
 
@@ -372,36 +379,40 @@ def extract_concode_like_features(rootdir, seed):
             path = os.path.join(root, file)
             if not path.endswith(".json"):
                 with open(path, 'rb') as f:
-                    count += 1
-                    g = Graph()
-                    print(path)
-                    g.ParseFromString(f.read())
-                    # print(g)
-                    id_to_node, id_to_connections = graph_to_map(g)
-                    methods = get_methods(id_to_node, id_to_connections)
-                    fields = get_fields(id_to_node, id_to_connections)
+                    try:
+                        with timeout(60 * 5, exception=RuntimeError):
+                            count += 1
+                            g = Graph()
+                            print(path)
+                            g.ParseFromString(f.read())
+                            # print(g)
+                            id_to_node, id_to_connections = graph_to_map(g)
+                            methods = get_methods(id_to_node, id_to_connections)
+                            fields = get_fields(id_to_node, id_to_connections)
 
-                    source_dict = {
-                        'methods': methods,
-                        'fields': fields,
-                        'path': path
-                    }
+                            source_dict = {
+                                'methods': methods,
+                                'fields': fields,
+                                'path': path
+                            }
 
-                    data = create_data(source_dict)
+                            data = create_data(source_dict)
 
-                    rnd = np.random.rand()
-                    if rnd > train+test:
-                        file_name = "valid"
-                    elif rnd > train:
-                        file_name = "test"
-                    else:
-                        file_name = "train"
+                            rnd = np.random.rand()
+                            if rnd > train+test:
+                                file_name = "valid"
+                            elif rnd > train:
+                                file_name = "test"
+                            else:
+                                file_name = "train"
 
-                    with codecs.open(file_name + '.json', 'a', 'utf-8') as out:
-                        for d in data:
-                            json_dump = json.dumps(d, ensure_ascii=False)
-                            out.write(json_dump)
-                            out.write("\n")
+                            with codecs.open(file_name + '.json', 'a', 'utf-8') as out:
+                                for d in data:
+                                    json_dump = json.dumps(d, ensure_ascii=False)
+                                    out.write(json_dump)
+                                    out.write("\n")
+                    except RuntimeError:
+                        pass
 
 
 def create_data(class_json):
@@ -413,17 +424,24 @@ def create_data(class_json):
     dataset = []
     for javadoc_method in methods_with_javadoc:
         if 'body' in javadoc_method:
-            datapoint = {
-                'nl': extract_javadoc_from_method(javadoc_method),
-                'nlToks': extract_javadoc_from_method(javadoc_method).split(" "),
-                'memberVariables': extract_fields(class_json),
-                'memberFunctions': extract_methods(class_json, javadoc_method),
-                'code': extract_code(javadoc_method),
-                'renamed': extract_code(javadoc_method),
-                'repo': "no_repo",
-                "className": extract_class_name(class_json)
-            }
-            dataset.append(datapoint)
+            code = extract_code(javadoc_method)
+            if len(code) < 500:
+                method_stats['qualified'] += 1
+                print(method_stats['qualified'])
+
+                datapoint = {
+                    'nl': extract_javadoc_from_method(javadoc_method),
+                    'nlToks': extract_javadoc_from_method(javadoc_method).split(" "),
+                    'memberVariables': extract_fields(class_json),
+                    'memberFunctions': extract_methods(class_json, javadoc_method),
+                    'code': code,
+                    'renamed': rename_code(javadoc_method),
+                    'repo': "no_repo",
+                    "className": extract_class_name(class_json)
+                }
+                dataset.append(datapoint)
+        method_stats['total'] += 1
+        print("Total", method_stats['total'])
     return dataset
 
 

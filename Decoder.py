@@ -116,122 +116,122 @@ class Decoder(nn.Module):
 
         return output, attn_scores, copy_attn_scores
 
-    # def predict(self, enc_hidden, context, context_lengths, batch, beam_size, max_code_length, generator, replace_unk,
-    #             vis_params):
-    #
-    #     # This decoder does not have input feeding. Parent state replces that
-    #     decState = DecoderState(
-    #         enc_hidden,  # encoder hidden
-    #         Variable(torch.zeros(1, 1, self.opt.decoder_rnn_size), requires_grad=False)  # parent state
-    #     )
-    #
-    #     # Repeat everything beam_size times.
-    #     def rvar(a, beam_size):
-    #         return Variable(a.repeat(beam_size, 1, 1), volatile=True)
-    #
-    #     context = tuple(rvar(context[i].data, beam_size) for i in range(0, len(context)))
-    #     context_lengths = tuple(context_lengths[i].repeat(beam_size, 1) for i in range(0, len(context_lengths)))
-    #
-    #     decState.repeat_beam_size_times(beam_size)
-    #
-    #     # Use only one beam
-    #     beam = TreeBeam(beam_size, True, self.vocabs, self.opt.decoder_rnn_size)
-    #
-    #     for count in range(0, max_code_length):  # We will break when we have the required number of terminals
-    #         # to be consistent with seq2seq
-    #
-    #         if beam.done():
-    #             break
-    #
-    #         # Construct batch x beam_size nxt words.
-    #         # Get all the pending current beam words and arrange for forward.
-    #         # Uses the start symbol in the beginning
-    #         inp = beam.getCurrentState()  # Should return a batch of the frontier
-    #
-    #         # Run one step., decState gets automatically updated
-    #         output, attn, copy_attn = self.forward(inp, context, context_lengths, decState)
-    #         src_map = torch.zeros(0, 0)
-    #         if self.opt.var_names:
-    #             src_map = torch.cat((src_map, batch['concode_src_map_vars']), 1)
-    #         if self.opt.method_names:
-    #             src_map = torch.cat((src_map, batch['concode_src_map_methods']), 1)
-    #
-    #         scores = generator(bottle(output), bottle(copy_attn), src_map, inp)  # generator needs the non-terminals
-    #
-    #         out = generator.collapseCopyScores(unbottle(scores.data.clone(), beam_size),
-    #                                            batch)  # needs seq2seq from batch
-    #         out = out.log()
-    #
-    #         # beam x tgt_vocab
-    #
-    #         beam.advance(out[:, 0], attn.data[:, 0], output)
-    #         decState.beam_update(beam.getCurrentOrigin(), beam_size)
-    #
-    #     pred_score_total = 0
-    #     pred_words_total = 0
-    #
-    #     score, times, k = beam.getFinal()  # times is the length of the prediction
-    #     hyp, att = beam.getHyp(times, k)
-    #     goldNl = []
-    #     if self.opt.var_names:
-    #         goldNl += batch['concode_var'][0]  # because batch = 1
-    #     if self.opt.method_names:
-    #         goldNl += batch['concode_method'][0]  # because batch = 1
-    #
-    #     goldCode = self.vocabs['code'].addStartOrEnd(batch['raw_code'][0])
-    #     predSent, copied_tokens, replaced_tokens = self.buildTargetTokens(
-    #         hyp,
-    #         self.vocabs,
-    #         goldNl,
-    #         att,
-    #         batch['concode_vocab'][0],
-    #         replace_unk
-    #     )
-    #     predSent = ConcodeDecoder.rulesToCode(predSent)
-    #     pred_score_total += score
-    #     pred_words_total += len(predSent)
-    #
-    #     return Prediction(goldNl, goldCode, predSent, att)
+    def predict(self, enc_hidden, context, context_lengths, batch, beam_size, max_code_length, generator, replace_unk,
+                vis_params):
 
-    # @staticmethod
-    # def rulesToCode(rules):
-    #     stack = []
-    #     code = []
-    #     for i in range(0, len(rules)):
-    #         if not CDDataset._is_terminal_rule(rules[i]):
-    #             stack.extend(rhs(rules[i]).split('___')[::-1])
-    #         else:
-    #             code.append(rhs(rules[i]))
-    #
-    #         try:
-    #             top = stack.pop()
-    #
-    #             while not top[0].isupper():
-    #                 code.append(top)
-    #                 if len(stack) == 0:
-    #                     break
-    #                 top = stack.pop()
-    #         except:
-    #             pass
-    #
-    #     return code
+        # This decoder does not have input feeding. Parent state replces that
+        decState = DecoderState(
+            enc_hidden,  # encoder hidden
+            Variable(torch.zeros(1, 1, self.opt.decoder_rnn_size), requires_grad=False)  # parent state
+        )
 
-    # def buildTargetTokens(self, pred, vocabs, src, attn, copy_vocab, replace_unk):
-    #     vocab = vocabs['next_rules']
-    #     tokens = []
-    #     copied_tokens, replaced_tokens = [], []
-    #     for tok in pred:
-    #         if tok < len(vocab):
-    #             tokens.append(vocab.itos[tok])
-    #         else:
-    #             tokens.append("IdentifierNT-->" + copy_vocab.itos[tok - len(vocab)])
-    #             copied_tokens.append(copy_vocab.itos[tok - len(vocab)])
+        # Repeat everything beam_size times.
+        def rvar(a, beam_size):
+            return Variable(a.repeat(beam_size, 1, 1), volatile=True)
+
+        context = tuple(rvar(context[i].data, beam_size) for i in range(0, len(context)))
+        context_lengths = tuple(context_lengths[i].repeat(beam_size, 1) for i in range(0, len(context_lengths)))
+
+        decState.repeat_beam_size_times(beam_size)
+
+        # Use only one beam
+        beam = TreeBeam(beam_size, True, self.vocabs, self.opt.decoder_rnn_size)
+
+        for count in range(0, max_code_length):  # We will break when we have the required number of terminals
+            # to be consistent with seq2seq
+
+            if beam.done():
+                break
+
+            # Construct batch x beam_size nxt words.
+            # Get all the pending current beam words and arrange for forward.
+            # Uses the start symbol in the beginning
+            inp = beam.getCurrentState()  # Should return a batch of the frontier
+
+            # Run one step., decState gets automatically updated
+            output, attn, copy_attn = self.forward(inp, context, context_lengths, decState)
+            src_map = torch.zeros(0, 0)
+            if self.opt.var_names:
+                src_map = torch.cat((src_map, batch['concode_src_map_vars']), 1)
+            if self.opt.method_names:
+                src_map = torch.cat((src_map, batch['concode_src_map_methods']), 1)
+
+            scores = generator(bottle(output), bottle(copy_attn), src_map, inp)  # generator needs the non-terminals
+
+            out = generator.collapseCopyScores(unbottle(scores.data.clone(), beam_size),
+                                               batch)  # needs seq2seq from batch
+            out = out.log()
+
+            # beam x tgt_vocab
+
+            beam.advance(out[:, 0], attn.data[:, 0], output)
+            decState.beam_update(beam.getCurrentOrigin(), beam_size)
+
+        pred_score_total = 0
+        pred_words_total = 0
+
+        score, times, k = beam.getFinal()  # times is the length of the prediction
+        hyp, att = beam.getHyp(times, k)
+        goldNl = []
+        if self.opt.var_names:
+            goldNl += batch['concode_var'][0]  # because batch = 1
+        if self.opt.method_names:
+            goldNl += batch['concode_method'][0]  # because batch = 1
+
+        goldCode = self.vocabs['code'].addStartOrEnd(batch['raw_code'][0])
+        predSent, copied_tokens, replaced_tokens = self.buildTargetTokens(
+            hyp,
+            self.vocabs,
+            goldNl,
+            att,
+            batch['concode_vocab'][0],
+            replace_unk
+        )
+        predSent = Decoder.rulesToCode(predSent)
+        pred_score_total += score
+        pred_words_total += len(predSent)
+
+        return Prediction(goldNl, goldCode, predSent, att)
     #
-    #     if replace_unk and attn is not None:
-    #         for i in range(len(tokens)):
-    #             if tokens[i] == '<unk>':
-    #                 _, maxIndex = attn[i].max(0)
-    #                 tokens[i] = "IdentifierNT-->" + src[maxIndex[0]]
-    #                 replaced_tokens.append(src[maxIndex[0]])
+    @staticmethod
+    def rulesToCode(rules):
+        stack = []
+        code = []
+        for i in range(0, len(rules)):
+            if not CDDataset._is_terminal_rule(rules[i]):
+                stack.extend(rhs(rules[i]).split('___')[::-1])
+            else:
+                code.append(rhs(rules[i]))
+
+            try:
+                top = stack.pop()
+
+                while not top[0].isupper():
+                    code.append(top)
+                    if len(stack) == 0:
+                        break
+                    top = stack.pop()
+            except:
+                pass
+
+        return code
     #
-    #     return tokens, copied_tokens, replaced_tokens
+    def buildTargetTokens(self, pred, vocabs, src, attn, copy_vocab, replace_unk):
+        vocab = vocabs['next_rules']
+        tokens = []
+        copied_tokens, replaced_tokens = [], []
+        for tok in pred:
+            if tok < len(vocab):
+                tokens.append(vocab.itos[tok])
+            else:
+                tokens.append("IdentifierNT-->" + copy_vocab.itos[tok - len(vocab)])
+                copied_tokens.append(copy_vocab.itos[tok - len(vocab)])
+
+        if replace_unk and attn is not None:
+            for i in range(len(tokens)):
+                if tokens[i] == '<unk>':
+                    _, maxIndex = attn[i].max(0)
+                    tokens[i] = "IdentifierNT-->" + src[maxIndex[0]]
+                    replaced_tokens.append(src[maxIndex[0]])
+
+        return tokens, copied_tokens, replaced_tokens

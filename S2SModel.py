@@ -6,7 +6,6 @@ from Decoder import Decoder
 from Encoder import Encoder
 from Statistics import Statistics
 from utils import bottle
-from Beam import Beam
 from CopyGenerator import CopyGenerator
 from decoders import DecoderState
 
@@ -52,9 +51,9 @@ class S2SModel(nn.Module):
         return loss, Statistics(loss.data[0], total, correct, self.encoder.n_src_words)
 
     # This only works for a batch size of 1
-    # def predict(self, batch, opt, vis_params):
-    #     curr_batch_size = batch['seq2seq'].size(0)
-    #     assert (curr_batch_size == 1)
-    #     context, context_lengths, enc_hidden = self.encoder(batch)
-    #     return self.decoder.predict(enc_hidden, context, context_lengths, batch, opt.beam_size, opt.max_sent_length,
-    #                                 self.generator, opt.replace_unk, vis_params)
+    def predict(self, batch, opt, vis_params):
+        curr_batch_size = batch['seq2seq'].size(0)
+        assert (curr_batch_size == 1)
+        context, context_lengths, enc_hidden = self.encoder(batch)
+        return self.decoder.predict(enc_hidden, context, context_lengths, batch, opt.beam_size, opt.max_sent_length,
+                                    self.generator, opt.replace_unk, vis_params)
