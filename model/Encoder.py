@@ -23,23 +23,23 @@ class Encoder(nn.Module):
 
         self.src_rnn = ProperLSTM(
             input_size=self.opt.src_word_vec_size * 2,
-            hidden_size=(self.opt.decoder_rnn_size // 2 if self.opt.brnn else self.opt.decoder_rnn_size),
+            hidden_size=(self.opt.decoder_rnn_size // 2),
             num_layers=self.opt.enc_layers,
             dropout=self.opt.dropout,
-            bidirectional=self.opt.brnn,
+            bidirectional=True,
             batch_first=True)
 
         self.camel_rnn = BottleLSTM(
             input_size=self.opt.src_word_vec_size * 2,
-            hidden_size=(self.opt.decoder_rnn_size // 2 if self.opt.brnn else self.opt.src_word_vec_size),
+            hidden_size=(self.opt.decoder_rnn_size // 2),
             num_layers=self.opt.enc_layers,
             dropout=self.opt.dropout,
-            bidirectional=self.opt.brnn,
+            bidirectional=True,
             batch_first=True)
 
         # self.type_rnn = BottleLSTM(
         #   input_size=self.opt.src_word_vec_size * 2,
-        #   hidden_size=(self.opt.decoder_rnn_size // 2 if self.opt.brnn else self.opt.src_word_vec_size),
+        #   hidden_size=(self.opt.decoder_rnn_size // 2),
         #   num_layers=self.opt.enc_layers,
         #   dropout=self.opt.dropout,
         #   bidirectional=self.opt.brnn,
@@ -47,18 +47,18 @@ class Encoder(nn.Module):
 
         self.var_rnn = BottleLSTM(
             input_size=self.opt.src_word_vec_size * 2,
-            hidden_size=(self.opt.decoder_rnn_size // 2 if self.opt.brnn else self.opt.rnn_size),
+            hidden_size=(self.opt.decoder_rnn_size // 2),
             num_layers=self.opt.enc_layers,
             dropout=self.opt.dropout,
-            bidirectional=self.opt.brnn,
+            bidirectional=True,
             batch_first=True)
 
         self.method_rnn = BottleLSTM(
             input_size=self.opt.src_word_vec_size * 2,
-            hidden_size=(self.opt.decoder_rnn_size // 2 if self.opt.brnn else self.opt.rnn_size),
+            hidden_size=(self.opt.decoder_rnn_size // 2),
             num_layers=self.opt.enc_layers,
             dropout=self.opt.dropout,
-            bidirectional=self.opt.brnn,
+            bidirectional=True,
             batch_first=True)
 
     def forward(self, batch):

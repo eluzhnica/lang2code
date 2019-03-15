@@ -28,20 +28,6 @@ def main():
                       help='Size of LSTM hidden states')
   parser.add_argument('-decoder_rnn_size', type=int, default=1024,
                       help='Size of LSTM hidden states')
-  parser.add_argument('-brnn', action="store_true",
-                      help="Use a bidirectional RNN in the encoder")
-  parser.add_argument('-nocamel', action="store_true",
-                      help="Do not split based on camel case.")
-  parser.add_argument('-var_names', action="store_true",
-                      help="Dont use variables.")
-  parser.add_argument('-twostep', action="store_true",
-                      help="Dont use 2-step attention.")
-  parser.add_argument('-method_names', action="store_true",
-                      help="Dont use methods.")
-  parser.add_argument('-trunc', type=int, default=-1,
-                      help='Truncate training set.')
-  parser.add_argument('-copy_attn', action="store_true",
-                      help='Train copy attention layer.')
   parser.add_argument('-data', required=True,
                       help="""Path prefix to the ".train.pt" and
                       ".valid.pt" file path from preprocess.py""")
@@ -59,16 +45,6 @@ def main():
                       help='Maximum batch size')
   parser.add_argument('-epochs', type=int, default=30,
                       help='Number of training epochs')
-  parser.add_argument('-encoder_type', default='regular',
-                      choices=['regular', 'concode'],
-                      help="""Encoder Type.""")
-  parser.add_argument('-decoder_type', default='regular',
-                      choices=['regular', 'prod', 'concode'],
-                      help="""Decoder Type.""")
-  parser.add_argument('-max_grad_norm', type=float, default=5,
-                      help="""If the norm of the gradient vector exceeds this,
-                      renormalize it to have the norm equal to
-                      max_grad_norm""")
   parser.add_argument('-dropout', type=float, default=0.3,
                       help="Dropout probability; applied in LSTM stacks.")
   # learning rate
@@ -85,11 +61,6 @@ def main():
 
   parser.add_argument('-report_every', type=int, default=500,
                       help="Print stats at this interval.")
-  parser.add_argument('-train_from', default='', type=str,
-                      help="""If training from a checkpoint then this is the
-                      path to the pretrained model's state_dict.""")
-  parser.add_argument('-start_epoch', type=int, default=None,
-                      help='The epoch from which to start. Use this together with train_from.')
 
   opt = parser.parse_args()
 

@@ -38,7 +38,7 @@ def main():
   vocabs = checkpoint['vocab']
   vocabs['mask'] = vocabs['mask']
 
-  test = CDDataset(opt.src, None, test=True, trunc=opt.trunc)
+  test = CDDataset(opt.src, None, test=True)
   test.toNumbers(checkpoint['vocab'])
   total_test = test.compute_batches(opt.batch_size, checkpoint['vocab'], checkpoint['opt'].max_camel, 0, 1, randomize=False, no_filter=True)
   sys.stderr.write('Total test: {}'.format(total_test))

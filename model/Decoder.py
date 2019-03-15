@@ -112,7 +112,7 @@ class Decoder(nn.Module):
 
         output = torch.cat(attn_outputs, 1)
         attn_scores = torch.cat(attn_scores, 1)
-        copy_attn_scores = torch.cat(copy_attn_scores, 1) if self.opt.copy_attn else None
+        copy_attn_scores = torch.cat(copy_attn_scores, 1)
 
         return output, attn_scores, copy_attn_scores
 
