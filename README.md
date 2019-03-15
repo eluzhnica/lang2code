@@ -55,6 +55,8 @@ To evaluate the model run:
 This will evaluate the model on the weights of the 2nd epoch (that model should exist in `data/processed/`). 
 Tweak start and end if needed to evaluate on more epochs, or other ones. 
 
+Predictions that the model outputs will be saved in `data/processed/preds`.
+
 
 ## Dataset
 
