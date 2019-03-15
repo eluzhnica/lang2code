@@ -37,6 +37,14 @@ class Encoder(nn.Module):
             bidirectional=self.opt.brnn,
             batch_first=True)
 
+        # self.type_rnn = BottleLSTM(
+        #   input_size=self.opt.src_word_vec_size * 2,
+        #   hidden_size=(self.opt.decoder_rnn_size // 2 if self.opt.brnn else self.opt.src_word_vec_size),
+        #   num_layers=self.opt.enc_layers,
+        #   dropout=self.opt.dropout,
+        #   bidirectional=self.opt.brnn,
+        #   batch_first=True)
+
         self.var_rnn = BottleLSTM(
             input_size=self.opt.src_word_vec_size * 2,
             hidden_size=(self.opt.decoder_rnn_size // 2 if self.opt.brnn else self.opt.rnn_size),
@@ -65,8 +73,6 @@ class Encoder(nn.Module):
 
         # varcamel is b x vlen x camel_len
         varCamel = Variable(batch['varNames'].transpose(1, 2).contiguous(), requires_grad=False)
-        if self.opt.nocamel:
-            varCamel = varCamel[:, :, 0:1].contiguous()
 
         varCamel_lengths = varCamel.ne(self.vocabs['names_combined'].stoi['<blank>']).float().sum(2)
         varNames_camel_embeddings = self.names_embedding(varCamel)
@@ -89,8 +95,7 @@ class Encoder(nn.Module):
 
         methodReturns = Variable(batch['methodReturns'], requires_grad=False)
         methodReturns_embeddings = self.types_embedding(methodReturns)
-        method_input = torch.cat((methodReturns_embeddings.unsqueeze(2), methodCamel_encoded[0][1, :].unsqueeze(2)),
-                                 2)
+        method_input = torch.cat((methodReturns_embeddings.unsqueeze(2), methodCamel_encoded[0][1, :].unsqueeze(2)), 2)
         method_lengths = methodReturns.ne(self.vocabs['types'].stoi['<blank>']).float() * 2
 
         method_context, method_hidden = self.method_rnn(method_input, method_lengths)
@@ -100,15 +105,14 @@ class Encoder(nn.Module):
         (batch_size, max_var_len) = batch['varTypes'].size()
         (batch_size, max_method_len) = batch['methodReturns'].size()
 
-        src_attention_mask = Variable(batch['src'].ne(self.vocabs['names_combined'].stoi['<blank>']),
-                                      requires_grad=False)
+        src_attention_mask = Variable(batch['src'].ne(self.vocabs['names_combined'].stoi['<blank>']), requires_grad=False)
         var_attention_mask = Variable(
             batch['varTypes'].ne(self.vocabs['types'].stoi['<blank>']).unsqueeze(2).expand(batch_size, max_var_len,
-                                                                                           2).contiguous().view(
-                batch_size, -1), requires_grad=False)
+                                                                                           2).contiguous().view(batch_size,
+                                                                                                                -1),
+            requires_grad=False)
         method_attention_mask = Variable(
-            batch['methodReturns'].ne(self.vocabs['types'].stoi['<blank>']).unsqueeze(2).expand(batch_size,
-                                                                                                max_method_len,
+            batch['methodReturns'].ne(self.vocabs['types'].stoi['<blank>']).unsqueeze(2).expand(batch_size, max_method_len,
                                                                                                 2).contiguous().view(
                 batch_size, -1), requires_grad=False)
 

@@ -11,7 +11,7 @@ class Trainer:
     def __init__(self, model):
         self.model = model
         self.opt = model.module.opt if isinstance(model, nn.parallel.DistributedDataParallel) else model.opt
-        self.start_epoch = self.opt.start_epoch if self.opt.start_epoch else 1
+        self.start_epoch = 1
 
         self.lr = self.opt.learning_rate
         self.betas = [0.9, 0.98]
@@ -43,11 +43,11 @@ class Trainer:
     def run_train_batched(self, train_data, valid_data, vocabs):
         print(self.model.parameters)
 
-        total_train = train_data.compute_batches(self.opt.batch_size, vocabs, self.opt.max_camel, 0, 1,
-                                                 self.opt.decoder_type, trunc=self.opt.trunc)
+        total_train = train_data.compute_batches(self.opt.batch_size, vocabs, self.opt.max_camel, 0, 1)
+
         total_valid = valid_data.compute_batches(
             10, vocabs, self.opt.max_camel, 0,
-            1, self.opt.decoder_type, randomize=False, trunc=self.opt.trunc)
+            1, randomize=False)
 
         print('Computed Batches. Total train={}, Total valid={}'.format(total_train, total_valid))
 

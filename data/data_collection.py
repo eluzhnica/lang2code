@@ -107,6 +107,10 @@ method_stats = {
 
 
 def stringify_node(node):
+    """
+    Turn a graph node to a dictionary
+    """
+
     node_dict = {
         'contents': node.contents,
         'startPosition': node.startPosition,
@@ -121,6 +125,12 @@ def stringify_node(node):
 
 
 def to_original_source_code(source_tokens):
+    """
+    Transforms graph tokens into source code tokens by transforming the tokenized symbols
+
+    Args:
+        source_tokens: list of tokens extracted from the graph
+    """
     result = []
     for token in source_tokens:
         if token in t_to_source:
@@ -131,6 +141,14 @@ def to_original_source_code(source_tokens):
 
 
 def graph_to_map(graph):
+    """
+    Turn the graph into two dictionaries: one that maps ids to node info, and one adjacency list
+
+    Args:
+        graph: original protobuf graph
+    Returns:
+        id to node info dictionary, adjacency list
+    """
     id_to_node = {}
     id_to_connections = {}
 
@@ -147,13 +165,19 @@ def graph_to_map(graph):
     return id_to_node, id_to_connections
 
 
-def get_source(file, start_position, end_position):
-    with open(file, 'rb') as f:
-        file_str = f.read()
-        return file_str
-
-
 def get_tokens(nodes, string_nodes, start_position, end_position):
+    """
+    Get all tokens in the range start_position and end_position
+    If the tokens are string nodes then wrap them in quotes
+
+    Args:
+        nodes: graph nodes
+        string_nodes: string nodes, see :get_string_nodes
+        start_position: start position in source
+        end_position: end position in source
+    Returns:
+        list of tokens
+    """
     tokens = []
     for node in nodes:
         if node.type == FeatureNode.IDENTIFIER_TOKEN or node.type == FeatureNode.TOKEN:
@@ -167,6 +191,15 @@ def get_tokens(nodes, string_nodes, start_position, end_position):
 
 
 def get_string_nodes(id_to_node, id_to_connections):
+    """
+    Finds all the string literal tokens in the graph that are not operators
+
+    Args:
+        id_to_node: dictionary mapping id to node info
+        id_to_connections: adjacency list
+    Returns:
+        set of node ids
+    """
     string_nodes = set()
 
     for node in id_to_node.values():
@@ -184,6 +217,14 @@ def get_string_nodes(id_to_node, id_to_connections):
 
 
 def clean_javadoc(javadoc_str):
+    """
+    Cleans the javadoc strings of the special fields
+
+    Args:
+        javadoc_str: javadoc string
+    Returns:
+        cleaned javadoc string
+    """
     lines = javadoc_str.split("\n")
     lines = [line for line in lines if "@param" not in line]
     stringed_lines = '\n'.join(lines)
@@ -194,11 +235,20 @@ def clean_javadoc(javadoc_str):
     return stringed_lines
 
 
-# [{
-#     'type': variable_type,
-#     'name': variable_name
-# }]
 def get_fields(id_to_node, id_to_connections):
+    """
+    Get type and name of all the field variables in the graph
+
+    Args:
+        id_to_node: dictionary mapping id to node info
+        id_to_connections: adjacency list
+    Returns:
+     [{
+         'type': variable_type,
+         'name': variable_name
+     }]
+    """
+
     fields = []
     string_nodes = get_string_nodes(id_to_node, id_to_connections)
 
@@ -225,6 +275,17 @@ def get_fields(id_to_node, id_to_connections):
 
 
 def get_subtree(root_id, id_to_node, id_to_connections):
+    """
+    Get the subtree graph starting with root_id
+
+    Args:
+        root_id: id of the root where the subtree begins
+        id_to_node: dictionary mapping id to node info
+        id_to_connections: adjacency list
+    Returns:
+        (root id, new id_to_node, new adjacency list)
+    """
+
     import copy
 
     nodes_in_subtree = get_subtree_dfs(root_id, id_to_node, id_to_connections)
@@ -247,6 +308,17 @@ def get_subtree(root_id, id_to_node, id_to_connections):
 
 
 def get_subtree_dfs(root_id, id_to_node, id_to_connections):
+    """
+    Get all the nodes belonging in the subtree starting with root_id
+
+    Args:
+        root_id: id of the root where the subtree begins
+        id_to_node: dictionary mapping id to node info
+        id_to_connections: adjacency list
+    Returns:
+        set of ids
+    """
+
     stack = [root_id]
     subtree_nodes = set()
 
@@ -261,19 +333,27 @@ def get_subtree_dfs(root_id, id_to_node, id_to_connections):
     return subtree_nodes
 
 
-# [{
-#     'body': {
-#         'id_to_node': {id -> nodeInfo},
-#         'id_to_connections': {id -> [ids]},
-#         'source': [tokens],
-#         'root': 'body_node_id'
-#     },
-#     'name': name,
-#     'type': return_type,
-#     'javadoc': javadoc_string,
-#     'parameters': [{'name': name, 'type': type}]
-# }]
 def get_methods(id_to_node, id_to_connections):
+    """
+    Extract all methods from the graph
+
+    Args:
+        id_to_node: dictionary mapping id to node info
+        id_to_connections: adjacency list
+    Returns:
+     [{
+         'body': {
+             'id_to_node': {id -> nodeInfo},
+             'id_to_connections': {id -> [ids]},
+             'source': [tokens],
+             'root': 'body_node_id'
+         },
+         'name': name,
+         'type': return_type,
+         'javadoc': javadoc_string,
+         'parameters': [{'name': name, 'type': type}]
+     }]
+    """
     methods = []
     string_nodes = get_string_nodes(id_to_node, id_to_connections)
     for node in id_to_node.values():
@@ -368,7 +448,15 @@ def update_statistics(source_dict, statistics):
                 statistics['javadoc_ast_nodes'] += len(method['body']['id_to_node'])
 
 
-def extract_concode_like_features(rootdir, seed):
+def extract_concode_like_features(rootdir, seed=42):
+    """
+    Extract all the .protobuf data in the CONCODE format
+
+    Write output to train.json, test.json, valid.json in the project root
+
+    Args:
+        rootdir: directory where the protobuf files are. searches recursively
+    """
     train = 0.8
     test = 0.1
     np.random.seed(seed)
@@ -425,7 +513,7 @@ def create_data(class_json):
     for javadoc_method in methods_with_javadoc:
         if 'body' in javadoc_method:
             code = extract_code(javadoc_method)
-            if len(code) < 500:
+            if len(code) < 200:
                 method_stats['qualified'] += 1
                 print(method_stats['qualified'])
 
@@ -446,6 +534,16 @@ def create_data(class_json):
 
 
 def split_camel_case(name):
+    """
+    Split camel case names into the subparts that form it
+
+    "thisIsCamelCase" -> ["this", "is", "camel", "case"]
+
+    Args:
+        name: string
+    Returns:
+        list of parts
+    """
     matches = finditer('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', name)
     return [m.group(0) for m in matches]
 
@@ -457,6 +555,26 @@ def extract_class_name(class_json):
 
 
 def extract_code(javadoc_method):
+    """
+    Turn a dictionary of the method into source code.
+    The source code is a full reconstruction including the return type, name, parameters, and body.
+
+    Args:
+        javadoc_method: {
+         'body': {
+             'id_to_node': {id -> nodeInfo},
+             'id_to_connections': {id -> [ids]},
+             'source': [tokens],
+             'root': 'body_node_id'
+         },
+         'name': name,
+         'type': return_type,
+         'javadoc': javadoc_string,
+         'parameters': [{'name': name, 'type': type}]
+     }
+    Returns:
+        complete method source code reconstruction, not only the body
+    """
     source = javadoc_method['body']['source']
     parameters = []
     if 'parameters' in javadoc_method:
@@ -474,6 +592,30 @@ def extract_code(javadoc_method):
 
 
 def rename_code(javadoc_method):
+    """
+    Turn a dictionary of the method into a canonical source code where parts of the method are renamed.
+    The source code is a full reconstruction including the return type, name, parameters, and body.
+
+    The arguments are renamed to arg0, arg1, arg2, ... . All the references in the code are also renamed
+    The method name is renamed to 'function'
+
+    Args:
+        javadoc_method: {
+         'body': {
+             'id_to_node': {id -> nodeInfo},
+             'id_to_connections': {id -> [ids]},
+             'source': [tokens],
+             'root': 'body_node_id'
+         },
+         'name': name,
+         'type': return_type,
+         'javadoc': javadoc_string,
+         'parameters': [{'name': name, 'type': type}]
+     }
+    Returns:
+        complete method source code reconstruction (renamed), not only the body
+    """
+
     names = {}
 
     source = javadoc_method['body']['source']
@@ -501,6 +643,23 @@ def rename_code(javadoc_method):
 
 
 def extract_fields(class_json):
+    """
+    Returns a mapping of all field variables
+
+    Args:
+        class_json: {
+            'methods': methods,
+            'fields': fields,
+            'path': path
+        }
+    Returns:
+        {
+            'field_name_1=0': 'type_1'
+            'field_name_2=0': 'type_2'
+            ...
+        }
+    """
+
     fields = class_json['fields']
     result = {}
     for field in fields:
@@ -512,6 +671,21 @@ def extract_fields(class_json):
 
 
 def extract_methods(class_json, javadoc_method):
+    """
+    Returns a mapping of the javadoc method
+
+    Args:
+        class_json: {
+            'methods': methods,
+            'fields': fields,
+            'path': path
+        }
+    Returns:
+        {
+            'method_name_1': ['parameter_type_1 parameter_name_1', 'parameter_type_2 parameter_name_2']
+            ...
+        }
+    """
     methods = {}
     for method in class_json['methods']:
         if not('javadoc' in method and method['javadoc'] == javadoc_method['javadoc']):

@@ -2,12 +2,12 @@ import torch
 from torch.autograd import Variable
 import torch.nn as nn
 
-from Decoder import Decoder
-from Encoder import Encoder
+from model.Decoder import Decoder
+from model.Encoder import Encoder
 from Statistics import Statistics
 from utils import bottle
-from CopyGenerator import CopyGenerator
-from decoders import DecoderState
+from model.CopyGenerator import ProdGenerator
+from model.decoders import DecoderState
 
 
 class S2SModel(nn.Module):
@@ -18,7 +18,7 @@ class S2SModel(nn.Module):
         self.vocabs = vocabs
         self.encoder = Encoder(vocabs, opt)
         self.decoder = Decoder(vocabs, opt)
-        self.generator = CopyGenerator(self.opt.decoder_rnn_size, vocabs, self.opt)
+        self.generator = ProdGenerator(self.opt.decoder_rnn_size, vocabs, self.opt)
         # self.cuda()
 
     def forward(self, batch):

@@ -1,11 +1,12 @@
 import torch
 from torch import nn
-from GlobalAttention import GlobalAttention
+from model.GlobalAttention import GlobalAttention
 from torch.autograd import Variable
 from Beam import TreeBeam
+from model.GlobalAttention import GlobalAttention
 from utils import bottle, unbottle
 from preprocess import rhs, CDDataset
-from decoders import DecoderState, Prediction
+from model.decoders import DecoderState, Prediction
 import torch.nn.functional as F
 
 
@@ -39,10 +40,9 @@ class Decoder(nn.Module):
             attn_type='general',
             include_rnn=False)
 
-        if opt.copy_attn:
-            self.copy_attn = GlobalAttention(
-                opt.decoder_rnn_size,
-                attn_type='general')
+        self.copy_attn = GlobalAttention(
+            opt.decoder_rnn_size,
+            attn_type='general')
 
         self.decoder_rnn = nn.LSTM(
             input_size=opt.tgt_word_vec_size * 3 + opt.decoder_rnn_size,  # nt and prev_rule
@@ -151,10 +151,8 @@ class Decoder(nn.Module):
             # Run one step., decState gets automatically updated
             output, attn, copy_attn = self.forward(inp, context, context_lengths, decState)
             src_map = torch.zeros(0, 0)
-            if self.opt.var_names:
-                src_map = torch.cat((src_map, batch['concode_src_map_vars']), 1)
-            if self.opt.method_names:
-                src_map = torch.cat((src_map, batch['concode_src_map_methods']), 1)
+            src_map = torch.cat((src_map, batch['concode_src_map_vars']), 1)
+            src_map = torch.cat((src_map, batch['concode_src_map_methods']), 1)
 
             scores = generator(bottle(output), bottle(copy_attn), src_map, inp)  # generator needs the non-terminals
 
@@ -173,10 +171,8 @@ class Decoder(nn.Module):
         score, times, k = beam.getFinal()  # times is the length of the prediction
         hyp, att = beam.getHyp(times, k)
         goldNl = []
-        if self.opt.var_names:
-            goldNl += batch['concode_var'][0]  # because batch = 1
-        if self.opt.method_names:
-            goldNl += batch['concode_method'][0]  # because batch = 1
+        goldNl += batch['concode_var'][0]  # because batch = 1
+        goldNl += batch['concode_method'][0]  # because batch = 1
 
         goldCode = self.vocabs['code'].addStartOrEnd(batch['raw_code'][0])
         predSent, copied_tokens, replaced_tokens = self.buildTargetTokens(

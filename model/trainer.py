@@ -6,29 +6,38 @@ from re import finditer
 
 import numpy
 
-
-# [{
-#     'environment': {
-#         'methods': [{
-#             'name': "name",
-#             'type': "type"
-#         }],
-#         'fields': [{
-#             'name': "name",
-#             'type': "type"
-#         }]
-#     },
-#     'method': {
-#         'doc': ["nl", "documentation", "tokens"],
-#         'ast_flat': ['flattened ast nodes in depth first, left-to-right fashion'],
-#         'ast': ['ast']
-#     }
-# }]
 from data.graph_pb2 import FeatureNode
-from model.layers import Encoder
+from model.layers import EncoderOne
 
 
 def create_data(class_json, production_rule_results):
+    """
+    Creates all the data needed to be fed to the model
+
+    Args:
+        class_json: class features
+        production_rule_results: production rules
+
+    Returns:
+         [{
+             'environment': {
+                 'methods': [{
+                     'name': "name",
+                     'type': "type"
+                 }],
+                 'fields': [{
+                     'name': "name",
+                     'type': "type"
+                 }]
+             },
+             'method': {
+                 'doc': ["nl", "documentation", "tokens"],
+                 'ast_flat': ['flattened ast nodes in depth first, left-to-right fashion'],
+                 'ast': ['ast']
+             }
+         }]
+    """
+
     methods_with_javadoc = []
     for method in class_json['methods']:
         if 'javadoc' in method:
@@ -117,6 +126,16 @@ def dfs_ast_left_to_right(id_to_node, id_to_connections, root_id, production_rul
 
 
 def flatten_ast(body_dict, production_rules_result):
+    """
+    Flattens the AST of the body in the order of a depth-first-search left-to-right traversal
+
+    Args:
+        body_dict: graph of the method body
+        production_rules_result: production rules
+    Returns:
+
+    """
+
     id_to_node = body_dict['id_to_node']
     id_to_connections = body_dict['id_to_connections']
     root_id = body_dict['root']
@@ -135,6 +154,16 @@ def flatten_ast(body_dict, production_rules_result):
 
 
 def types_names_dictionary(dataset):
+    """
+    Extracts all the type and names in a dictionary mapping to the number of ocurrences
+
+    Args:
+        dataset: dataset dictionary
+
+    Returns:
+        types dictionary, names dictionary
+    """
+
     types = set()
     names = set()
     for data in dataset:
@@ -156,6 +185,10 @@ def types_names_dictionary(dataset):
 
 
 def prepare_data(dataset, name_dict, types_dict):
+    """
+    Turn data to tensors
+    """
+
     for data in dataset:
         if 'environment' in data:
             for method in data['environment']['methods']:
@@ -168,41 +201,44 @@ def prepare_data(dataset, name_dict, types_dict):
         data['method']['doc'] = torch.LongTensor([name_dict[x] for x in data['method']['doc']])
 
 
-def split_data(rootdir):
-    js_files = []
-    for root, _, files in os.walk(rootdir):
-        for file in files[:2]:
-            path = os.path.join(root, file)
-            if path.endswith(".json"):
-                with codecs.open(path, 'r', 'utf-8') as f:
-                    js = json.loads(f.read())
-                    js_files.append(js)
-    train = js_files[len(js_files)-2000:]
-    test = js_files[:len(js_files)-2000]
-
-    production_rules = {}
-    train_data = []
-    test_data = []
-    count = 0
-    for class_json in train:
-        print(count)
-        count+=1
-        train_data += create_data(class_json, production_rules)
-
-    for class_json in test:
-        print(count)
-        count+=1
-        test_data += create_data(class_json, None)
-
-    print("Methods", len([x for x in train_data if 'method' in x]))
-
-    types, names = types_names_dictionary(train_data)
-    encoder = Encoder(types, 50, names, 25)
-    prepare_data(train_data, names, types)
-    for data in train_data:
-        methods = torch.LongTensor([]) if 'environment' not in data else data['environment']['methods']
-        fields = torch.LongTensor([]) if 'environment' not in data else data['environment']['fields']
-
-        nl = data['method']['doc']
-        encoder(nl, methods, fields)
-
+# def split_data(rootdir):
+#     """
+#     Split all the data into train and test
+#     """
+#     js_files = []
+#     for root, _, files in os.walk(rootdir):
+#         for file in files[:2]:
+#             path = os.path.join(root, file)
+#             if path.endswith(".json"):
+#                 with codecs.open(path, 'r', 'utf-8') as f:
+#                     js = json.loads(f.read())
+#                     js_files.append(js)
+#     train = js_files[len(js_files)-2000:]
+#     test = js_files[:len(js_files)-2000]
+#
+#     production_rules = {}
+#     train_data = []
+#     test_data = []
+#     count = 0
+#     for class_json in train:
+#         print(count)
+#         count+=1
+#         train_data += create_data(class_json, production_rules)
+#
+#     for class_json in test:
+#         print(count)
+#         count+=1
+#         test_data += create_data(class_json, None)
+#
+#     print("Methods", len([x for x in train_data if 'method' in x]))
+#
+#     types, names = types_names_dictionary(train_data)
+#     encoder = Encoder(types, 50, names, 25)
+#     prepare_data(train_data, names, types)
+#     for data in train_data:
+#         methods = torch.LongTensor([]) if 'environment' not in data else data['environment']['methods']
+#         fields = torch.LongTensor([]) if 'environment' not in data else data['environment']['fields']
+#
+#         nl = data['method']['doc']
+#         encoder(nl, methods, fields)
+#

@@ -3,4 +3,5 @@ dpu-utils
 numpy
 protobuf
 allennlp==0.3.0
+antlr4-python3-runtime==4.6
 matplotlib

@@ -1,7 +1,7 @@
 import argparse
-from preprocess import Vocab, CDDataset
+from preprocess import CDDataset
 import torch
-from S2SModel import S2SModel
+from model.S2SModel import S2SModel
 import sys
 
 parser = argparse.ArgumentParser(description='translate.py')
@@ -40,7 +40,7 @@ def main():
 
   test = CDDataset(opt.src, None, test=True, trunc=opt.trunc)
   test.toNumbers(checkpoint['vocab'])
-  total_test = test.compute_batches(opt.batch_size, checkpoint['vocab'], checkpoint['opt'].max_camel, 0, 1, checkpoint['opt'].decoder_type, randomize=False, no_filter=True)
+  total_test = test.compute_batches(opt.batch_size, checkpoint['vocab'], checkpoint['opt'].max_camel, 0, 1, randomize=False, no_filter=True)
   sys.stderr.write('Total test: {}'.format(total_test))
   sys.stderr.flush()
 

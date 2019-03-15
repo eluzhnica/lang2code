@@ -149,7 +149,7 @@ class Vocab:
 
 
 class Dataset:
-    def compute_batches(self, batch_size, vocabs, max_camel, rank, num_gpus, decoder_type, randomize=True, trunc=-1,
+    def compute_batches(self, batch_size, vocabs, max_camel, rank, num_gpus, randomize=True, trunc=-1,
                         no_filter=False):
         timer = time.process_time()
 

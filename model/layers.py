@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 
-class Encoder(nn.Module):
+class EncoderOne(nn.Module):
 
     def __init__(self,
                  type_words,
@@ -11,7 +11,7 @@ class Encoder(nn.Module):
                  name_words,
                  encoder_dim,
                  ):
-        super(Encoder, self).__init__()
+        super(EncoderOne, self).__init__()
 
         self.type_embedding = nn.Embedding(len(type_words), embedding_dim)
 
@@ -105,7 +105,7 @@ class Encoder(nn.Module):
         return nl_encoding, environment_encodings,
 
 
-class Decoder(nn.Module):
+class DecoderOne(nn.Module):
     def __init__(self,
                  non_terminals_length,
                  rules_length,
@@ -113,7 +113,7 @@ class Decoder(nn.Module):
                  decoder_rnn_size,
                  max_prod_rules
                  ):
-        super(Decoder, self).__init__()
+        super(DecoderOne, self).__init__()
 
         self.nt_embedding = nn.Embedding(non_terminals_length, embedding_dim)
         self.rules_embedding = nn.Embedding(rules_length, embedding_dim)
@@ -160,7 +160,9 @@ class Decoder(nn.Module):
 
         copy_t = F.sigmoid(self.copy_weights(ct))
 
-        # return
+        res = copy_t*et + next_prod_rule*(1-copy_t)
+
+        return res
 
 
 class Attention(nn.Module):
