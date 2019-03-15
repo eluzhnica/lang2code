@@ -37,6 +37,7 @@ class Encoder(nn.Module):
             bidirectional=True,
             batch_first=True)
 
+        # Used for the generic types
         # self.type_rnn = BottleLSTM(
         #   input_size=self.opt.src_word_vec_size * 2,
         #   hidden_size=(self.opt.decoder_rnn_size // 2),

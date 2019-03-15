@@ -2,6 +2,12 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+"""
+Encoder and Decoder for single-item batch size. 
+Not being used. 
+Here for illustrative purposes only.
+"""
+
 
 class EncoderOne(nn.Module):
 
